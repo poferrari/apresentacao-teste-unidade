@@ -1,7 +1,7 @@
-CREATE DATABASE SqlOrder
+CREATE DATABASE BaseSqlOder
 GO
 
-USE SqlOrder
+USE BaseSqlOder
 GO
 
 CREATE TABLE dbo.Customer(

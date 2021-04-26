@@ -6,7 +6,6 @@ using Store.Models;
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
-using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -15,6 +14,7 @@ namespace LojaExemplo.Api.Services
     public class OrderService : IOrderService
     {
         private readonly string _connectionString;
+        private const string _urlApiDeliveryFee = "http://www.buscacep.correios.com.br/api-teste/calcula.php";
 
         public OrderService(string connectionString)
         {
@@ -27,18 +27,16 @@ namespace LojaExemplo.Api.Services
             Customer customer = null;
             using (var conn = new SqlConnection(_connectionString))
             {
-                customer = conn.Query<Customer>
-                    ("SELECT * FROM Customer WHERE ID=" + createOrderRequest.CustomerId)
-                    .FirstOrDefault();
+                customer = await conn.QueryFirstOrDefaultAsync<Customer>($"SELECT * FROM dbo.Customer WHERE Id={createOrderRequest.CustomerId}");
             }
 
             // #2 - Calcula o frete
             decimal deliveryFee = 0;
-            var request = new HttpRequestMessage(HttpMethod.Get, "URL/" + createOrderRequest.ZipCode);
+            var request = new HttpRequestMessage(HttpMethod.Get, $"{_urlApiDeliveryFee}/{createOrderRequest.ZipCode}");
             request.Headers.Add("Accept", "application/json");
             request.Headers.Add("User-Agent", "HttpClientFactory-Sample");
 
-            using (HttpClient client = new HttpClient())
+            using (var client = new HttpClient())
             {
                 var response = await client.SendAsync(request);
                 if (response.IsSuccessStatusCode)
@@ -62,9 +60,7 @@ namespace LojaExemplo.Api.Services
                 var product = new Product();
                 using (var conn = new SqlConnection(_connectionString))
                 {
-                    product = conn.Query<Product>
-                        ("SELECT * FROM Product WHERE ID=" + itemProduct.ProductId)
-                        .FirstOrDefault();
+                    product = await conn.QueryFirstAsync<Product>($"SELECT * FROM Product WHERE Id={itemProduct.ProductId}");
                 }
                 subTotal += product.Price;
 
@@ -81,9 +77,7 @@ namespace LojaExemplo.Api.Services
             decimal discount = 0;
             using (var conn = new SqlConnection(_connectionString))
             {
-                var promo = conn.Query<PromoCode>
-                    ("SELECT * FROM PromoCode WHERE CODE=" + createOrderRequest.PromoCode)
-                    .FirstOrDefault();
+                var promo = await conn.QueryFirstOrDefaultAsync<PromoCode>($"SELECT * FROM PromoCode WHERE Code='{createOrderRequest.PromoCode}'");
                 if (promo != null && promo.ExpireDate > DateTime.Now)
                 {
                     discount = promo.Value;
@@ -93,6 +87,7 @@ namespace LojaExemplo.Api.Services
             // #5 - Gera o pedido
             var order = new Order();
             order.Code = Guid.NewGuid().ToString().ToUpper().Substring(0, 8);
+            order.CustomerId = customer.Id;
             order.Date = DateTime.Now;
             order.DeliveryFee = deliveryFee;
             order.Discount = discount;
