@@ -1,0 +1,16 @@
+version: '3.1'
+
+volumes:
+  sqlvolume:
+
+services:
+  sql-server-db:
+    container_name: sql-server-db
+    image: mcr.microsoft.com/mssql/server:2019-CU3-ubuntu-18.04
+    volumes:
+      - sqlvolume:/var/opt/mssql
+    ports:
+      - "1433:1433"
+    environment:
+      SA_PASSWORD: "SqlServer2019!"
+      ACCEPT_EULA: "Y"
