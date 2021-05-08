@@ -13,10 +13,10 @@ namespace LojaExemplo.Api.Orders.Commands
     public class CreateOrderCommandHandler : IRequestHandler<CreateOrderCommand, OrderMessage>
     {
         private readonly ILogger<CreateOrderCommandHandler> _logger;
-        private readonly IOrderServiceLegado _orderService;
+        private readonly IOrderService _orderService;
 
         public CreateOrderCommandHandler(ILogger<CreateOrderCommandHandler> logger,
-            IOrderServiceLegado orderService)
+            IOrderService orderService)
         {
             _logger = logger;
             _orderService = orderService;
@@ -33,6 +33,7 @@ namespace LojaExemplo.Api.Orders.Commands
                     throw new Exception($"The command \"{nameof(CreateOrderCommand)}\" could not be null.");
                 }
 
+                // Fail Fast Validation
                 if (!request.IsValid)
                 {
                     var errors = request.ValidationResult.Errors.Select(error => error.ErrorMessage).ToList();

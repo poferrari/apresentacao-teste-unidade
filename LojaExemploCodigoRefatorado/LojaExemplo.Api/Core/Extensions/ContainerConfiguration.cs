@@ -1,6 +1,9 @@
-﻿using LojaExemplo.Api.Services;
+﻿using LojaExemplo.Api.Orders.Repositories;
+using LojaExemplo.Api.Orders.Services;
+using LojaExemplo.Api.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Store.Domain.Repositories.Interfaces;
 
 namespace LojaExemplo.Api.Core.Extensions
 {
@@ -12,8 +15,11 @@ namespace LojaExemplo.Api.Core.Extensions
         {
             var sqlOrderConnectionStringName = GetSqlOrderConnectionString(configuration);
 
-            services.AddScoped<IOrderServiceLegado>(sp => new OrderServiceLegado(sqlOrderConnectionStringName));
-
+            services.AddScoped<ICustomerRepository>(sp => new CustomerRepository(sqlOrderConnectionStringName));
+            services.AddScoped<IDiscountRepository>(sp => new DiscountRepository(sqlOrderConnectionStringName));
+            services.AddScoped<IProductRepository>(sp => new ProductRepository(sqlOrderConnectionStringName));
+            services.AddScoped<IDeliveryFeeService, DeliveryFeeService>();
+            services.AddScoped<IOrderService, OrderService>();
             return services;
         }
 

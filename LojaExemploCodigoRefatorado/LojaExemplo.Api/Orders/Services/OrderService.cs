@@ -1,28 +1,29 @@
-﻿using Dapper;
-using LojaExemplo.Api.Models;
-using LojaExemplo.Api.Orders.Commands;
+﻿using LojaExemplo.Api.Orders.Commands;
 using LojaExemplo.Api.Orders.Reponses;
+using LojaExemplo.Api.Orders.Repositories;
+using LojaExemplo.Api.Orders.Services;
 using Store.Domain.Repositories.Interfaces;
 using Store.Models;
-using System;
-using System.Collections.Generic;
-using System.Data.SqlClient;
-using System.Net.Http;
 using System.Threading.Tasks;
 
 namespace LojaExemplo.Api.Services
 {
     public class OrderService : IOrderService
     {
-        private readonly string _connectionString;
         private readonly ICustomerRepository _customerRepository;
-        private const string _urlApiDeliveryFee = "http://www.buscacep.correios.com.br/api-teste/calcula.php";
+        private readonly IDeliveryFeeService _deliveryFeeService;
+        private readonly IDiscountRepository _discountRepository;
+        private readonly IProductRepository _productRepository;
 
-        public OrderService(string connectionString,
-            ICustomerRepository customerRepository)
+        public OrderService(ICustomerRepository customerRepository,
+            IDeliveryFeeService deliveryFeeService,
+            IDiscountRepository discountRepository,
+            IProductRepository productRepository)
         {
-            _connectionString = connectionString;
             _customerRepository = customerRepository;
+            _deliveryFeeService = deliveryFeeService;
+            _discountRepository = discountRepository;
+            _productRepository = productRepository;
         }
 
         public async Task<OrderMessage> SendOrder(CreateOrderRequest createOrderRequest)
@@ -30,74 +31,19 @@ namespace LojaExemplo.Api.Services
             // #1 - Recupera o cliente
             Customer customer = await _customerRepository.Get(createOrderRequest.CustomerId);
 
-            // #2 - Calcula o frete
-            decimal deliveryFee = 0;
-            var request = new HttpRequestMessage(HttpMethod.Get, $"{_urlApiDeliveryFee}/{createOrderRequest.ZipCode}");
-            request.Headers.Add("Accept", "application/json");
-            request.Headers.Add("User-Agent", "HttpClientFactory-Sample");
+            // #2 - Calcula a taxa de entrega
+            decimal deliveryFee = await _deliveryFeeService.GetDeliveryFee(createOrderRequest.ZipCode);
 
-            using (var client = new HttpClient())
-            {
-                var response = await client.SendAsync(request);
-                if (response.IsSuccessStatusCode)
-                {
-                    deliveryFee = decimal.Parse(await response.Content.ReadAsStringAsync());
-                }
-                else
-                {
-                    // Caso não consiga obter a taxa de entrega o valor padrão é 5
-                    deliveryFee = 5;
-                }
-            }
+            // #3 - Obtém o cupom de desconto
+            decimal discount = await _discountRepository.Get(createOrderRequest.PromoCode);
 
-            // #3 - Calcula o total dos produtos
-            var orderProducts = new List<OrderProduct>();
-            decimal subTotal = 0;
-            for (int p = 0; p < createOrderRequest.OrderProducts.Count; p++)
-            {
-                var itemProduct = createOrderRequest.OrderProducts[p];
-
-                var product = new Product();
-                using (var conn = new SqlConnection(_connectionString))
-                {
-                    product = await conn.QueryFirstAsync<Product>($"SELECT * FROM Product WHERE Id={itemProduct.ProductId}");
-                }
-                subTotal += product.Price;
-
-                orderProducts.Add(new OrderProduct
-                {
-                    ProductId = itemProduct.ProductId,
-                    Amount = itemProduct.Amount,
-                    ProductValue = product.Price,
-                    Total = itemProduct.Amount * product.Price
-                });
-            }
-
-            // #4 - Aplica o cupom de desconto
-            decimal discount = 0;
-            using (var conn = new SqlConnection(_connectionString))
-            {
-                var promo = await conn.QueryFirstOrDefaultAsync<PromoCode>($"SELECT * FROM PromoCode WHERE Code='{createOrderRequest.PromoCode}'");
-                if (promo != null && promo.ExpireDate > DateTime.Now)
-                {
-                    discount = promo.Value;
-                }
-            }
+            // #4 - Obter produtos
+            var orderProducts = await _productRepository.GetOrders(createOrderRequest.OrderProducts);
 
             // #5 - Gera o pedido
-            var order = new Order();
-            order.Code = Guid.NewGuid().ToString().ToUpper().Substring(0, 8);
-            order.CustomerId = customer.Id;
-            order.Date = DateTime.Now;
-            order.DeliveryFee = deliveryFee;
-            order.Discount = discount;
-            order.OrderProducts = orderProducts;
-            order.SubTotal = subTotal;
+            var order = new Order(customer, deliveryFee, discount, orderProducts);
 
-            // #6 - Calcula o total
-            order.Total = subTotal - discount + deliveryFee;
-
-            // #7 - Retorna
+            // #6 - Retornar pedido gerado
             return new OrderMessage
             {
                 Order = order,

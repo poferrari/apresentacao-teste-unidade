@@ -6,9 +6,9 @@ using System.Threading.Tasks;
 
 namespace LojaExemplo.Tests.Orders.Services
 {
-    public class OrderServiceLegadoTests
+    public class OrderServiceTests
     {
-        private OrderServiceLegado _orderService;
+        private OrderService _orderService;
         private const string _connectionString = "string";
         private CreateOrderRequest _createOrderRequest;
         private readonly int _customerId = 1;
@@ -33,7 +33,7 @@ namespace LojaExemplo.Tests.Orders.Services
                 }
             };
 
-            _orderService = new OrderServiceLegado(_connectionString);
+            //_orderService = new OrderService(_connectionString);
         }
 
         [Test]
